@@ -50,43 +50,51 @@ fun DayPieceScreen(
     // 샘플 일정 데이터 생성
     val sampleSchedules = listOf(
         ScheduleItem(
-            title = "아침 운동",
-            startHour = 7,
+            title = "잠",
+            startHour = 23,
             startMinute = 0,
-            endHour = 8,
+            endHour = 5,
             endMinute = 30,
+            color = SchedulePurple
+        ),
+        ScheduleItem(
+            title = "헬스",
+            startHour = 5,
+            startMinute = 30,
+            endHour = 7,
+            endMinute = 0,
             color = ScheduleGreen
         ),
         ScheduleItem(
-            title = "회의",
-            startHour = 10,
-            startMinute = 15,
-            endHour = 11,
-            endMinute = 45,
-            color = ScheduleBlue
-        ),
-        ScheduleItem(
-            title = "점심 식사",
-            startHour = 12,
+            title = "아침식사 및 출근준비",
+            startHour = 7,
             startMinute = 0,
-            endHour = 13,
+            endHour = 8,
             endMinute = 0,
             color = ScheduleOrange
         ),
         ScheduleItem(
-            title = "프로젝트 작업",
-            startHour = 14,
-            startMinute = 30,
-            endHour = 17,
+            title = "출근",
+            startHour = 8,
+            startMinute = 0,
+            endHour = 9,
+            endMinute = 0,
+            color = ScheduleBlue
+        ),
+        ScheduleItem(
+            title = "회사",
+            startHour = 9,
+            startMinute = 0,
+            endHour = 18,
             endMinute = 0,
             color = ScheduleTeal
         ),
         ScheduleItem(
-            title = "저녁 식사",
+            title = "자유시간",
             startHour = 18,
-            startMinute = 30,
-            endHour = 19,
-            endMinute = 30,
+            startMinute = 0,
+            endHour = 23,
+            endMinute = 0,
             color = ScheduleRed
         )
     )

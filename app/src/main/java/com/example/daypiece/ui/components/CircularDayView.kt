@@ -4,7 +4,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,7 +17,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
@@ -46,9 +44,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.daypiece.model.ScheduleItem
+import java.util.Calendar
 import kotlin.math.cos
 import kotlin.math.sin
-import java.util.Calendar
+import androidx.compose.ui.graphics.toArgb
+
 
 /**
  * 이미지와 동일한 디자인의 원형 일간표 뷰
@@ -60,10 +60,13 @@ fun CircularDayView(
 ) {
     val backgroundColor = MaterialTheme.colorScheme.background
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
-    
+
     val animatedProgress by animateFloatAsState(
         targetValue = 1f,
-        animationSpec = tween(durationMillis = 1000, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+        animationSpec = tween(
+            durationMillis = 1000,
+            easing = androidx.compose.animation.core.FastOutSlowInEasing
+        ),
         label = "circular_view_animation"
     )
 
@@ -79,14 +82,14 @@ fun CircularDayView(
                 .fillMaxWidth()
                 .padding(vertical = 12.dp)
         )
-        
+
         // 요일/날짜 행
         WeekHeader(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 16.dp)
         )
-        
+
         // 원형 시간표
         Box(
             modifier = Modifier
@@ -158,7 +161,7 @@ fun CircularDayView(
                     }
                 }
             }
-            
+
             // 시간 텍스트 표시 (원형 가장자리 가까이, 진하게)
             // 흰색 테두리 크기(2.5dp)만큼만 간격 두기
             val borderWidthPx = 2.5.dp.value
@@ -167,7 +170,7 @@ fun CircularDayView(
                 val radius = 170.dp.value * animatedProgress
                 val textX = (radius - borderWidthPx) * cos(angle).toFloat() // 흰색 테두리 크기만큼만
                 val textY = (radius - borderWidthPx) * sin(angle).toFloat()
-                
+
                 Text(
                     text = "${hour}",
                     color = onSurfaceColor.copy(alpha = 0.9f),
@@ -178,7 +181,7 @@ fun CircularDayView(
                         .offset(x = textX.dp, y = textY.dp)
                 )
             }
-            
+
             // 일정 텍스트를 섹터 안에 중앙에 배치 (섹터 아크를 따라 회전)
             Canvas(
                 modifier = Modifier
@@ -190,7 +193,7 @@ fun CircularDayView(
                 // 흰색 테두리 크기(2.5dp)만큼만 간격 두기
                 val borderWidth = 2.5.dp.toPx()
                 val innerRadius = outerRadius - borderWidth // 시간 텍스트 전까지
-                
+
                 schedules.forEachIndexed { index, schedule ->
                     drawScheduleText(
                         centerX = centerX,
@@ -204,7 +207,7 @@ fun CircularDayView(
                 }
             }
         }
-        
+
         // 하단 일정 목록
         ScheduleList(
             schedules = schedules,
@@ -226,7 +229,7 @@ fun MonthHeader(
     val calendar = Calendar.getInstance()
     val year = calendar.get(Calendar.YEAR)
     val month = calendar.get(Calendar.MONTH) + 1
-    
+
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -238,7 +241,7 @@ fun MonthHeader(
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
-        
+
         Box {
             Text(
                 text = "주간",
@@ -248,7 +251,7 @@ fun MonthHeader(
                     .clickable { expanded = true }
                     .padding(8.dp)
             )
-            
+
             DropdownMenu(
                 expanded = expanded,
                 onDismissRequest = { expanded = false }
@@ -279,7 +282,7 @@ fun WeekHeader(
 ) {
     val calendar = Calendar.getInstance()
     val today = calendar.get(Calendar.DAY_OF_WEEK)
-    
+
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.SpaceEvenly
@@ -291,7 +294,7 @@ fun WeekHeader(
             }
             dayCalendar.get(Calendar.DAY_OF_MONTH)
         }
-        
+
         days.forEachIndexed { index, day ->
             val isToday = index == (today - Calendar.MONDAY)
             Column(
@@ -341,7 +344,7 @@ fun ScheduleList(
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(bottom = 12.dp)
         )
-        
+
         // 일정 목록
         schedules.forEach { schedule ->
             Row(
@@ -365,7 +368,7 @@ fun ScheduleList(
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     modifier = Modifier.width(50.dp)
                 )
-                
+
                 // 색상 인디케이터 (세로선)
                 Box(
                     modifier = Modifier
@@ -376,9 +379,9 @@ fun ScheduleList(
                             RoundedCornerShape(2.dp)
                         )
                 )
-                
+
                 Spacer(modifier = Modifier.width(12.dp))
-                
+
                 // 제목과 설명
                 Column(
                     modifier = Modifier.weight(1f)
@@ -391,7 +394,7 @@ fun ScheduleList(
                     )
                     // 설명은 ScheduleItem에 없으므로 생략
                 }
-                
+
                 // 검색 아이콘
                 Icon(
                     imageVector = Icons.Default.Search,
@@ -417,12 +420,12 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawHourMarker(
 ) {
     val angle = Math.toRadians((hour * 15.0) - 90.0)
     val animatedRadius = radius * animatedProgress
-    
+
     val startX = centerX + (animatedRadius - 8) * cos(angle).toFloat()
     val startY = centerY + (animatedRadius - 8) * sin(angle).toFloat()
     val endX = centerX + animatedRadius * cos(angle).toFloat()
     val endY = centerY + animatedRadius * sin(angle).toFloat()
-    
+
     drawLine(
         color = onSurfaceColor.copy(alpha = 0.3f),
         start = Offset(startX, startY),
@@ -447,12 +450,12 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMinuteMarker(
     val totalMinutes = hour * 60 + minute
     val angle = Math.toRadians((totalMinutes * 360.0 / 1440.0) - 90.0)
     val animatedRadius = radius * animatedProgress
-    
+
     val startX = centerX + (animatedRadius - 4) * cos(angle).toFloat()
     val startY = centerY + (animatedRadius - 4) * sin(angle).toFloat()
     val endX = centerX + (animatedRadius - 1) * cos(angle).toFloat()
     val endY = centerY + (animatedRadius - 1) * sin(angle).toFloat()
-    
+
     drawLine(
         color = onSurfaceColor.copy(alpha = 0.15f),
         start = Offset(startX, startY),
@@ -473,12 +476,44 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawScheduleSector(
     animatedProgress: Float,
     delay: Int = 0
 ) {
-    val startAngle = timeToAngle(schedule.startHour, schedule.startMinute)
-    val endAngle = timeToAngle(schedule.endHour, schedule.endMinute)
+    // 시작 시간과 종료 시간을 분 단위로 계산
+    val startMinutes = schedule.startHour * 60 + schedule.startMinute
+    val endMinutes = schedule.endHour * 60 + schedule.endMinute
     
-    val progress = (animatedProgress * 1000 - delay).coerceIn(0f, 1000f) / 1000f
-    val animatedEndAngle = startAngle + (endAngle - startAngle) * progress
+    // 각도 계산: 0분 = -90도(12시), 360분 = 0도(3시), 720분 = 90도(6시), 1080분 = 180도(9시)
+    var startAngle = (startMinutes * 360f / 1440f) - 90f
+    var endAngle = (endMinutes * 360f / 1440f) - 90f
     
+    // 종료 시간이 시작 시간보다 작거나 같으면 자정을 넘어간 경우이므로 360도를 더함
+    // 분 단위로 비교하는 것이 더 정확함
+    if (endMinutes <= startMinutes) {
+        endAngle += 360f
+    }
+    
+    // 각도를 0-360도 범위로 정규화 (arcTo가 음수 각도를 제대로 처리하지 못할 수 있음)
+    startAngle = ((startAngle % 360f) + 360f) % 360f
+    endAngle = ((endAngle % 360f) + 360f) % 360f
+    
+    // 스윕 각도 계산 (항상 양수, 0-360도 범위 내에서)
+    val sweepAngle = if (endAngle >= startAngle) {
+        endAngle - startAngle
+    } else {
+        endAngle + 360f - startAngle
+    }.coerceAtLeast(0.1f) // 최소 0.1도 보장
+
+    // 애니메이션 진행도 계산 (delay를 고려하되, 최종적으로는 1.0이 되도록)
+    val totalDuration = 1000f
+    val delayedStart = delay.toFloat()
+    val animationDuration = totalDuration - delayedStart
+    
+    val progress = if (animatedProgress * totalDuration < delayedStart) {
+        0f // 아직 시작 안 함
+    } else {
+        ((animatedProgress * totalDuration - delayedStart) / animationDuration).coerceIn(0f, 1f)
+    }
+    
+    val animatedSweepAngle = sweepAngle * progress
+
     val path = Path().apply {
         moveTo(centerX, centerY)
         lineTo(
@@ -491,19 +526,19 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawScheduleSector(
                 radius = radius
             ),
             startAngleDegrees = startAngle,
-            sweepAngleDegrees = animatedEndAngle - startAngle,
+            sweepAngleDegrees = animatedSweepAngle,
             forceMoveTo = false
         )
         lineTo(centerX, centerY)
         close()
     }
-    
+
     // 섹터 그리기 (단색)
     drawPath(
         path = path,
         color = schedule.color.copy(alpha = 0.4f) // 단색, 반투명
     )
-    
+
     // 흰색 테두리 그리기
     drawPath(
         path = path,
@@ -524,66 +559,105 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawScheduleText(
     delay: Int = 0,
     onSurfaceColor: Color
 ) {
-    val progress = (animatedProgress * 1000 - delay).coerceIn(0f, 1000f) / 1000f
-    if (progress < 0.7f) return
+    // 애니메이션 진행도 계산 (delay를 고려하되, 최종적으로는 1.0이 되도록)
+    val totalDuration = 1000f
+    val delayedStart = delay.toFloat()
+    val animationDuration = totalDuration - delayedStart
     
-    val startAngle = timeToAngle(schedule.startHour, schedule.startMinute)
-    val endAngle = timeToAngle(schedule.endHour, schedule.endMinute)
-    val middleAngle = (startAngle + endAngle) / 2f
-    
-    // 섹터의 각도 범위 계산
-    val sweepAngle = endAngle - startAngle
-    val sweepAngleRad = Math.toRadians(sweepAngle.toDouble() / 2.0)
-    
-    // 텍스트가 섹터를 벗어나지 않도록 최대 너비 계산
-    val maxTextWidth = 2 * radius * sin(sweepAngleRad).toFloat() * 0.7f
-    val calculatedTextSize = (maxTextWidth / schedule.title.length).coerceIn(10f, 14f)
-    
-    // 텍스트 길이 제한
-    val maxChars = (maxTextWidth / (calculatedTextSize * density * 0.55f)).toInt().coerceAtMost(schedule.title.length)
-    val text = if (schedule.title.length > maxChars) {
-        schedule.title.take(maxChars - 3) + "..."
+    val progress = if (animatedProgress * totalDuration < delayedStart) {
+        0f // 아직 시작 안 함
     } else {
-        schedule.title
+        ((animatedProgress * totalDuration - delayedStart) / animationDuration).coerceIn(0f, 1f)
     }
     
-    // 텍스트 위치 계산 (섹터의 중간 지점, 반지름의 60% 지점)
-    val textRadius = radius * 0.6f
-    val angleRad = Math.toRadians(middleAngle.toDouble())
-    val textX = centerX + textRadius * cos(angleRad).toFloat()
-    val textY = centerY + textRadius * sin(angleRad).toFloat()
+    if (progress < 0.7f) return
+
+    // 시작 시간과 종료 시간을 분 단위로 계산
+    val startMinutes = schedule.startHour * 60 + schedule.startMinute
+    val endMinutes = schedule.endHour * 60 + schedule.endMinute
     
-    // 텍스트 그리기
-    drawIntoCanvas { canvas ->
-        val paint = android.graphics.Paint().apply {
-            val alpha = (0.95f * 255).toInt()
-            val red = (onSurfaceColor.red * 255).toInt()
-            val green = (onSurfaceColor.green * 255).toInt()
-            val blue = (onSurfaceColor.blue * 255).toInt()
-            color = android.graphics.Color.argb(alpha, red, green, blue)
-            textSize = calculatedTextSize * density
-            textAlign = android.graphics.Paint.Align.CENTER
-            typeface = android.graphics.Typeface.create(
-                android.graphics.Typeface.DEFAULT,
-                android.graphics.Typeface.NORMAL
-            )
-            isAntiAlias = true
+    // 각도 계산
+    val startAngle = (startMinutes * 360f / 1440f) - 90f
+    var endAngle = (endMinutes * 360f / 1440f) - 90f
+    
+    // 종료 시간이 시작 시간보다 작거나 같으면 자정을 넘어간 경우이므로 360도를 더함
+    // 분 단위로 비교하는 것이 더 정확함
+    if (endMinutes <= startMinutes) {
+        endAngle += 360f
+    }
+
+    // 섹터 중간 각도 계산 (0-360도 범위로 정규화)
+    val middleAngle = ((startAngle + endAngle) / 2f).let { angle ->
+        if (angle < 0) angle + 360f else if (angle >= 360f) angle - 360f else angle
+    }
+    val middleRad = Math.toRadians(middleAngle.toDouble())
+
+    // 중심에서 밖으로 향하는 단위 벡터
+    val dirX = cos(middleRad).toFloat()
+    val dirY = sin(middleRad).toFloat()
+
+    // 텍스트를 시작할 반지름 (중앙에서 얼마나 떨어져서 첫 줄을 그릴지)
+    val startDistance = radius * 0.5f
+
+    // 섹터 각도로부터 한 줄에 들어갈 최대 너비 산출
+    // 섹터의 sweep 절반을 사용해 대략적인 내부 폭 계산
+    // endAngle은 이미 자정을 넘어가는 경우 360도가 더해져 있으므로 단순히 차이만 계산
+    val sweepAngle = endAngle - startAngle
+    val sweepHalfRad = Math.toRadians((sweepAngle / 2f).toDouble())
+    val approxMaxWidth = (2 * radius * sin(sweepHalfRad)).toFloat() * 0.7f
+    val maxTextWidth = approxMaxWidth.coerceAtLeast(30f) // 최소 보장
+
+    // 기본 텍스트 크기(디바이스 밀도 보정)
+    val baseTextSizePx = (14f * density).coerceIn(10f * density, 18f * density)
+
+    // native Paint
+    val paint = android.graphics.Paint().apply {
+        color = onSurfaceColor.toArgb()
+        isAntiAlias = true
+        textAlign = android.graphics.Paint.Align.CENTER
+        textSize = baseTextSizePx
+    }
+
+    // 텍스트를 한 줄로만 표시 (줄바꿈 없음)
+    fun measureTextWidth(s: String): Float = paint.measureText(s)
+    
+    // 텍스트가 너무 길면 자르기
+    var text = schedule.title
+    if (measureTextWidth(text) > maxTextWidth) {
+        var truncated = text
+        while (measureTextWidth("$truncated...") > maxTextWidth && truncated.isNotEmpty()) {
+            truncated = truncated.dropLast(1)
         }
-        
-        canvas.nativeCanvas.save()
+        text = if (truncated.isEmpty()) "..." else "$truncated..."
+    }
+
+    // 텍스트 위치 계산 (섹터의 중간 지점)
+    val px = centerX + dirX * startDistance
+    val py = centerY + dirY * startDistance
+
+    drawIntoCanvas { canvas ->
+        val native = canvas.nativeCanvas
+        native.save()
         
         // 텍스트 위치로 이동
-        canvas.nativeCanvas.translate(textX, textY)
+        native.translate(px, py)
         
-        // 섹터의 중간 각도에 맞춰 텍스트 회전 (섹터 아크를 따라)
-        canvas.nativeCanvas.rotate(middleAngle + 90f)
-        
-        // 텍스트 그리기 (중앙 정렬)
-        canvas.nativeCanvas.drawText(text, 0f, 0f, paint)
-        
-        canvas.nativeCanvas.restore()
+        // 섹터의 중간 각도 방향으로 텍스트 회전
+        // timeToAngle: -90도 = 12시, 0도 = 3시, 90도 = 6시, 180도 = 9시
+        // Android Canvas rotate: 0도 = 오른쪽(3시), 90도 = 아래쪽(6시), -90도 = 위쪽(12시)
+        // middleAngle을 그대로 사용하면 섹터와 동일한 각도로 회전됨
+        native.rotate(middleAngle)
+
+        // 세로 중심 보정: paint.descent()를 이용
+        val textOffsetY = (paint.descent() + paint.ascent()) / 2f * -1f
+
+        // drawText는 baseline 기준이므로 작은 조정 필요
+        native.drawText(text, 0f, textOffsetY, paint)
+
+        native.restore()
     }
 }
+
 
 /**
  * 시간과 분을 각도로 변환
