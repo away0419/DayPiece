@@ -26,10 +26,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -69,6 +71,16 @@ fun CircularDayView(
         ),
         label = "circular_view_animation"
     )
+    
+    // 현재 시간을 추적하여 분침을 움직이게 함
+    var currentTimeMillis by remember { mutableStateOf(System.currentTimeMillis()) }
+    
+    LaunchedEffect(Unit) {
+        while (true) {
+            currentTimeMillis = System.currentTimeMillis()
+            delay(1000) // 1초마다 업데이트
+        }
+    }
 
     Column(
         modifier = modifier
@@ -160,6 +172,22 @@ fun CircularDayView(
                         )
                     }
                 }
+                
+                // 현재 시간 분침 그리기
+                val calendar = Calendar.getInstance().apply {
+                    timeInMillis = currentTimeMillis
+                }
+                val currentHour = calendar.get(Calendar.HOUR_OF_DAY)
+                val currentMinute = calendar.get(Calendar.MINUTE)
+                
+                drawCurrentTimeHand(
+                    centerX = centerX,
+                    centerY = centerY,
+                    radius = innerRadius,
+                    hour = currentHour,
+                    minute = currentMinute,
+                    onSurfaceColor = onSurfaceColor
+                )
             }
 
             // 시간 텍스트 표시 (원형 가장자리 가까이, 진하게)
@@ -297,6 +325,13 @@ fun WeekHeader(
 
         days.forEachIndexed { index, day ->
             val isToday = index == (today - Calendar.MONDAY)
+            // 토요일(index=5)은 파란색, 일요일(index=6)은 빨간색
+            val dayColor = when (index) {
+                5 -> Color(0xFF2196F3) // 토요일 - 파란색
+                6 -> Color(0xFFE53935) // 일요일 - 빨간색
+                else -> MaterialTheme.colorScheme.onSurface.copy(alpha = if (isToday) 1f else 0.5f)
+            }
+            
             Column(
                 modifier = Modifier
                     .width(40.dp)
@@ -310,13 +345,13 @@ fun WeekHeader(
                 Text(
                     text = day,
                     fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isToday) 1f else 0.5f),
+                    color = dayColor,
                     fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal
                 )
                 Text(
                     text = "${dates[index]}",
                     fontSize = 16.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isToday) 1f else 0.7f),
+                    color = dayColor,
                     fontWeight = if (isToday) FontWeight.Bold else FontWeight.Medium,
                     modifier = Modifier.padding(top = 4.dp)
                 )
@@ -462,6 +497,74 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMinuteMarker(
         end = Offset(endX, endY),
         strokeWidth = 0.8.dp.toPx(),
         cap = StrokeCap.Round
+    )
+}
+
+/**
+ * 현재 시간을 나타내는 화살표 인디케이터 그리기
+ * 원형 테두리와 시간 텍스트 사이의 빈 공간에 화살표만 표시
+ */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCurrentTimeHand(
+    centerX: Float,
+    centerY: Float,
+    radius: Float,
+    hour: Int,
+    minute: Int,
+    onSurfaceColor: Color
+) {
+    // 현재 시간을 분 단위로 계산
+    val totalMinutes = hour * 60 + minute
+    // 각도 계산 (0분 = -90도(12시), 360분 = 0도(3시), 시계방향)
+    val angle = Math.toRadians((totalMinutes * 360.0 / 1440.0) - 90.0)
+    
+    // 화살표 위치: 원형 테두리(radius)와 시간 텍스트(약 170dp) 사이의 빈 공간
+    // 화살표 끝점 (중심쪽을 가리킴)
+    val arrowTipRadius = radius + 8f // 원형 테두리 바로 안쪽
+    val arrowTipX = centerX + arrowTipRadius * cos(angle).toFloat()
+    val arrowTipY = centerY + arrowTipRadius * sin(angle).toFloat()
+    
+    // 화살표 크기
+    val arrowSize = 18.dp.toPx() // 화살표 높이
+    val arrowWidth = 16.dp.toPx() // 화살표 밑변 너비
+    
+    // 화살표 방향 (중심을 향하도록)
+    val arrowAngle = angle + Math.PI // 180도 회전 (안쪽을 가리키도록)
+    
+    // 화살표 밑변의 왼쪽 점
+    val leftAngle = arrowAngle + Math.toRadians(90.0)
+    val arrowLeft1X = arrowTipX + arrowSize * cos(arrowAngle).toFloat() + (arrowWidth / 2) * cos(leftAngle).toFloat()
+    val arrowLeft1Y = arrowTipY + arrowSize * sin(arrowAngle).toFloat() + (arrowWidth / 2) * sin(leftAngle).toFloat()
+    
+    // 화살표 밑변의 오른쪽 점
+    val rightAngle = arrowAngle - Math.toRadians(90.0)
+    val arrowRight1X = arrowTipX + arrowSize * cos(arrowAngle).toFloat() + (arrowWidth / 2) * cos(rightAngle).toFloat()
+    val arrowRight1Y = arrowTipY + arrowSize * sin(arrowAngle).toFloat() + (arrowWidth / 2) * sin(rightAngle).toFloat()
+    
+    // 화살표 Path 생성 (삼각형)
+    val arrowPath = Path().apply {
+        moveTo(arrowTipX, arrowTipY) // 화살표 끝점
+        lineTo(arrowLeft1X, arrowLeft1Y) // 왼쪽 점
+        lineTo(arrowRight1X, arrowRight1Y) // 오른쪽 점
+        close()
+    }
+    
+    // 화살표 그림자 효과 (약간 큰 검은색 화살표)
+    drawPath(
+        path = arrowPath,
+        color = Color.Black.copy(alpha = 0.2f)
+    )
+    
+    // 화살표 그리기 (밝은 빨간색)
+    drawPath(
+        path = arrowPath,
+        color = Color(0xFFFF5252)
+    )
+    
+    // 화살표 테두리 (흰색으로 강조)
+    drawPath(
+        path = arrowPath,
+        color = Color.White,
+        style = Stroke(width = 2.dp.toPx())
     )
 }
 
