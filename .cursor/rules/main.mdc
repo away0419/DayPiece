@@ -1,0 +1,6 @@
+---
+alwaysApply: true
+---
+
+라이브러리 함수 사용을 코드에 추가할 경우 해당 라이브러리 import 확인.
+import 추가 시 해당 라이브러리 설치 되어있는지 확인 후 없을 경우 dependency에 추가 혹은 install.

@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -17,6 +18,7 @@ import com.example.daypiece.model.ScheduleItem
 import com.example.daypiece.ui.components.CircularDayView
 import com.example.daypiece.ui.components.ScheduleDetailDialog
 import com.example.daypiece.ui.components.ScheduleEditDialog
+import com.example.daypiece.ui.screens.ScheduleAddScreen
 import com.example.daypiece.ui.theme.DayPieceTheme
 import com.example.daypiece.ui.theme.ScheduleBlue
 import com.example.daypiece.ui.theme.ScheduleGreen
@@ -120,41 +122,47 @@ fun DayPieceScreen(
     // 다이얼로그 상태
     var showDetailDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
-    var showAddDialog by remember { mutableStateOf(false) }
     var selectedSchedule by remember { mutableStateOf<ScheduleItem?>(null) }
+    
+    // 화면 전환 상태
+    var showAddScheduleScreen by remember { mutableStateOf(false) }
 
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        floatingActionButton = {
-            // 일정 추가 FAB
-            FloatingActionButton(
-                onClick = { showAddDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "일정 추가"
-                )
-            }
+    Box(
+        modifier = modifier.fillMaxSize()
+    ) {
+        
+        if (!showAddScheduleScreen) {
+            // 메인 화면: 원형 일간표
+            CircularDayView(
+                schedules = filteredSchedules,
+                selectedDate = selectedDate,
+                onDateSelected = { newDate ->
+                    selectedDate = newDate
+                    // 날짜 변경 시 해당 날짜의 일정을 로드
+                    // 추후 날짜별 일정 관리 기능 추가 시 여기서 처리
+                },
+                onScheduleClick = { schedule ->
+                    selectedSchedule = schedule
+                    showDetailDialog = true
+                },
+                onAddScheduleClick = {
+                    // 원형 시간표 클릭 시 일정 추가 화면으로 전환
+                    showAddScheduleScreen = true
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            // 일정 추가 화면
+            ScheduleAddScreen(
+                onSave = { newSchedule ->
+                    viewModel.addSchedule(newSchedule)
+                    showAddScheduleScreen = false
+                },
+                onCancel = {
+                    showAddScheduleScreen = false
+                }
+            )
         }
-    ) { paddingValues ->
-        // 원형 일간표 (헤더와 표 포함)
-        CircularDayView(
-            schedules = filteredSchedules,
-            selectedDate = selectedDate,
-            onDateSelected = { newDate ->
-                selectedDate = newDate
-                // 날짜 변경 시 해당 날짜의 일정을 로드
-                // 추후 날짜별 일정 관리 기능 추가 시 여기서 처리
-            },
-            onScheduleClick = { schedule ->
-                selectedSchedule = schedule
-                showDetailDialog = true
-            },
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        )
 
         // 일정 상세 다이얼로그
         if (showDetailDialog && selectedSchedule != null) {
@@ -192,17 +200,6 @@ fun DayPieceScreen(
             )
         }
 
-        // 일정 추가 다이얼로그
-        if (showAddDialog) {
-            ScheduleEditDialog(
-                schedule = null,
-                onDismiss = { showAddDialog = false },
-                onSave = { newSchedule ->
-                    viewModel.addSchedule(newSchedule)
-                    showAddDialog = false
-                }
-            )
-        }
     }
 }
 

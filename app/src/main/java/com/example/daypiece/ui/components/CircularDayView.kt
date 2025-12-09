@@ -72,6 +72,7 @@ fun CircularDayView(
     selectedDate: Calendar = Calendar.getInstance(),
     onDateSelected: (Calendar) -> Unit = {},
     onScheduleClick: (ScheduleItem) -> Unit = {},
+    onAddScheduleClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val backgroundColor = MaterialTheme.colorScheme.background
@@ -145,7 +146,7 @@ fun CircularDayView(
                     .size(340.dp)
                     .pointerInput(schedules) {
                         detectTapGestures { offset ->
-                            // 클릭 위치에서 일정 찾기
+                            // 클릭 위치 확인
                             val centerX = size.width / 2f
                             val centerY = size.height / 2f
                             val outerRadius = minOf(centerX, centerY) - 50f
@@ -159,39 +160,8 @@ fun CircularDayView(
 
                             // 원형 시간표 내부를 클릭했는지 확인
                             if (distance <= innerRadius) {
-                                // 클릭 각도 계산 (0도 = 3시 방향)
-                                val angle = kotlin.math.atan2(dy.toDouble(), dx.toDouble())
-                                val angleDegrees = Math.toDegrees(angle).toFloat()
-                                // -90도를 더해 12시 방향을 0도로 만듦
-                                val normalizedAngle = ((angleDegrees + 90f + 360f) % 360f)
-
-                                // 각도를 시간(분 단위)으로 변환
-                                val clickedMinutes = (normalizedAngle * 1440f / 360f).toInt()
-
-                                // 해당 시간에 있는 일정 찾기
-                                val clickedSchedule = schedules.find { schedule ->
-                                    val startMinutes =
-                                        schedule.startHour * 60 + schedule.startMinute
-                                    var endMinutes = schedule.endHour * 60 + schedule.endMinute
-
-                                    // 자정을 넘어가는 경우 처리
-                                    if (endMinutes <= startMinutes) {
-                                        endMinutes += 1440
-                                    }
-
-                                    // 클릭한 시간이 일정 범위 내에 있는지 확인
-                                    if (endMinutes <= startMinutes) {
-                                        false
-                                    } else if (endMinutes > 1440) {
-                                        // 자정을 넘어가는 경우
-                                        clickedMinutes >= startMinutes || clickedMinutes <= (endMinutes - 1440)
-                                    } else {
-                                        clickedMinutes >= startMinutes && clickedMinutes <= endMinutes
-                                    }
-                                }
-
-                                // 일정을 찾았으면 콜백 호출
-                                clickedSchedule?.let { onScheduleClick(it) }
+                                // 일정 추가 화면으로 이동
+                                onAddScheduleClick()
                             }
                         }
                     }
@@ -324,6 +294,17 @@ fun CircularDayView(
                         onSurfaceColor = onSurfaceColor
                     )
                 }
+            }
+            
+            // 일정이 없을 때 중앙에 안내 문구 표시
+            if (schedules.isEmpty()) {
+                Text(
+                    text = "FREE TODAY!",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                    modifier = Modifier.align(Alignment.Center)
+                )
             }
         }
 
@@ -510,16 +491,19 @@ fun ScheduleList(
                     .padding(2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 시간
+                // 시간 (시작~종료)
                 Text(
                     text = String.format(
-                        "%02d:%02d",
+                        "%02d:%02d\n%02d:%02d",
                         schedule.startHour,
-                        schedule.startMinute
+                        schedule.startMinute,
+                        schedule.endHour,
+                        schedule.endMinute
                     ),
-                    fontSize = 13.sp,
+                    fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                    modifier = Modifier.width(50.dp)
+                    modifier = Modifier.width(50.dp),
+                    lineHeight = 14.sp
                 )
 
                 // 색상 인디케이터 (세로선)
