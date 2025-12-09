@@ -5,9 +5,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,8 +22,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -31,7 +33,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -42,15 +43,25 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.daypiece.model.ScheduleItem
+import kotlinx.coroutines.delay
 import java.util.Calendar
 import kotlin.math.cos
 import kotlin.math.sin
-import androidx.compose.ui.graphics.toArgb
 
+
+/**
+ * 뷰 모드 (주간/월간)
+ */
+enum class ViewMode {
+    WEEKLY,
+    MONTHLY
+}
 
 /**
  * 이미지와 동일한 디자인의 원형 일간표 뷰
@@ -58,10 +69,21 @@ import androidx.compose.ui.graphics.toArgb
 @Composable
 fun CircularDayView(
     schedules: List<ScheduleItem>,
+    selectedDate: Calendar = Calendar.getInstance(),
+    onDateSelected: (Calendar) -> Unit = {},
+    onScheduleClick: (ScheduleItem) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val backgroundColor = MaterialTheme.colorScheme.background
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+
+    // 뷰 모드 상태 (주간/월간)
+    var viewMode by remember { mutableStateOf(ViewMode.WEEKLY) }
+
+    // 오늘 날짜와 비교
+    val today = Calendar.getInstance()
+    val isToday = selectedDate.get(Calendar.YEAR) == today.get(Calendar.YEAR) &&
+            selectedDate.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR)
 
     val animatedProgress by animateFloatAsState(
         targetValue = 1f,
@@ -71,10 +93,10 @@ fun CircularDayView(
         ),
         label = "circular_view_animation"
     )
-    
+
     // 현재 시간을 추적하여 분침을 움직이게 함
     var currentTimeMillis by remember { mutableStateOf(System.currentTimeMillis()) }
-    
+
     LaunchedEffect(Unit) {
         while (true) {
             currentTimeMillis = System.currentTimeMillis()
@@ -88,8 +110,15 @@ fun CircularDayView(
             .background(backgroundColor)
             .padding(horizontal = 20.dp)
     ) {
-        // 상단 헤더: "2024년 5월"과 "주간" 드롭다운
+        // 상단 헤더: "2024년 5월"과 "주간/월간" 토글 버튼, "오늘로" 버튼
         MonthHeader(
+            selectedDate = selectedDate,
+            viewMode = viewMode,
+            showTodayButton = !isToday,
+            onViewModeToggle = {
+                viewMode = if (viewMode == ViewMode.WEEKLY) ViewMode.MONTHLY else ViewMode.WEEKLY
+            },
+            onTodayClick = { onDateSelected(Calendar.getInstance()) },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 12.dp)
@@ -97,6 +126,8 @@ fun CircularDayView(
 
         // 요일/날짜 행
         WeekHeader(
+            selectedDate = selectedDate,
+            onDateSelected = onDateSelected,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 16.dp)
@@ -112,6 +143,58 @@ fun CircularDayView(
             Canvas(
                 modifier = Modifier
                     .size(340.dp)
+                    .pointerInput(schedules) {
+                        detectTapGestures { offset ->
+                            // 클릭 위치에서 일정 찾기
+                            val centerX = size.width / 2f
+                            val centerY = size.height / 2f
+                            val outerRadius = minOf(centerX, centerY) - 50f
+                            val borderWidth = 2.5.dp.toPx()
+                            val innerRadius = outerRadius - borderWidth
+
+                            // 클릭 좌표를 중심 기준으로 변환
+                            val dx = offset.x - centerX
+                            val dy = offset.y - centerY
+                            val distance = kotlin.math.sqrt(dx * dx + dy * dy)
+
+                            // 원형 시간표 내부를 클릭했는지 확인
+                            if (distance <= innerRadius) {
+                                // 클릭 각도 계산 (0도 = 3시 방향)
+                                val angle = kotlin.math.atan2(dy.toDouble(), dx.toDouble())
+                                val angleDegrees = Math.toDegrees(angle).toFloat()
+                                // -90도를 더해 12시 방향을 0도로 만듦
+                                val normalizedAngle = ((angleDegrees + 90f + 360f) % 360f)
+
+                                // 각도를 시간(분 단위)으로 변환
+                                val clickedMinutes = (normalizedAngle * 1440f / 360f).toInt()
+
+                                // 해당 시간에 있는 일정 찾기
+                                val clickedSchedule = schedules.find { schedule ->
+                                    val startMinutes =
+                                        schedule.startHour * 60 + schedule.startMinute
+                                    var endMinutes = schedule.endHour * 60 + schedule.endMinute
+
+                                    // 자정을 넘어가는 경우 처리
+                                    if (endMinutes <= startMinutes) {
+                                        endMinutes += 1440
+                                    }
+
+                                    // 클릭한 시간이 일정 범위 내에 있는지 확인
+                                    if (endMinutes <= startMinutes) {
+                                        false
+                                    } else if (endMinutes > 1440) {
+                                        // 자정을 넘어가는 경우
+                                        clickedMinutes >= startMinutes || clickedMinutes <= (endMinutes - 1440)
+                                    } else {
+                                        clickedMinutes >= startMinutes && clickedMinutes <= endMinutes
+                                    }
+                                }
+
+                                // 일정을 찾았으면 콜백 호출
+                                clickedSchedule?.let { onScheduleClick(it) }
+                            }
+                        }
+                    }
             ) {
                 val centerX = size.width / 2
                 val centerY = size.height / 2
@@ -120,9 +203,9 @@ fun CircularDayView(
                 val borderWidth = 2.5.dp.toPx()
                 val innerRadius = outerRadius - borderWidth // 시간 텍스트 전까지
 
-                // 외곽 원형 배경 (연한 회색)
+                // 외곽 원형 배경 (밝은 회색)
                 drawCircle(
-                    color = Color(0xFFE5E7EB),
+                    color = Color.LightGray,
                     radius = outerRadius,
                     center = Offset(centerX, centerY)
                 )
@@ -145,6 +228,14 @@ fun CircularDayView(
                         delay = index * 100
                     )
                 }
+                
+                // 항상 보이는 외곽 흰색 테두리 (일정 유무와 관계없이)
+                drawCircle(
+                    color = Color.White,
+                    radius = innerRadius,
+                    center = Offset(centerX, centerY),
+                    style = Stroke(width = 2.5.dp.toPx())
+                )
 
                 // 시간 표시선 그리기
                 for (hour in 0..23) {
@@ -172,14 +263,14 @@ fun CircularDayView(
                         )
                     }
                 }
-                
+
                 // 현재 시간 분침 그리기
                 val calendar = Calendar.getInstance().apply {
                     timeInMillis = currentTimeMillis
                 }
                 val currentHour = calendar.get(Calendar.HOUR_OF_DAY)
                 val currentMinute = calendar.get(Calendar.MINUTE)
-                
+
                 drawCurrentTimeHand(
                     centerX = centerX,
                     centerY = centerY,
@@ -239,6 +330,7 @@ fun CircularDayView(
         // 하단 일정 목록
         ScheduleList(
             schedules = schedules,
+            onScheduleClick = onScheduleClick,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 16.dp)
@@ -247,16 +339,19 @@ fun CircularDayView(
 }
 
 /**
- * 상단 헤더: "2024년 5월"과 "주간" 드롭다운
+ * 상단 헤더: "2024년 5월"과 "주간/월간" 토글 버튼, "오늘로" 버튼
  */
 @Composable
 fun MonthHeader(
+    selectedDate: Calendar,
+    viewMode: ViewMode,
+    showTodayButton: Boolean,
+    onViewModeToggle: () -> Unit,
+    onTodayClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    val calendar = Calendar.getInstance()
-    val year = calendar.get(Calendar.YEAR)
-    val month = calendar.get(Calendar.MONTH) + 1
+    val year = selectedDate.get(Calendar.YEAR)
+    val month = selectedDate.get(Calendar.MONTH) + 1
 
     Row(
         modifier = modifier,
@@ -270,31 +365,37 @@ fun MonthHeader(
             color = MaterialTheme.colorScheme.onSurface
         )
 
-        Box {
-            Text(
-                text = "주간",
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                modifier = Modifier
-                    .clickable { expanded = true }
-                    .padding(8.dp)
-            )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // 오늘로 버튼 (오늘이 아닐 때만 표시)
+            if (showTodayButton) {
+                Button(
+                    onClick = onTodayClick,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary
+                    ),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "오늘로",
+                        fontSize = 13.sp
+                    )
+                }
+            }
 
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false }
+            // 주간/월간 토글 버튼
+            Button(
+                onClick = onViewModeToggle,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                ),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
             ) {
-                DropdownMenuItem(
-                    text = { Text("주간") },
-                    onClick = { expanded = false }
-                )
-                DropdownMenuItem(
-                    text = { Text("일간") },
-                    onClick = { expanded = false }
-                )
-                DropdownMenuItem(
-                    text = { Text("월간") },
-                    onClick = { expanded = false }
+                Text(
+                    text = if (viewMode == ViewMode.WEEKLY) "주간" else "월간",
+                    fontSize = 13.sp
                 )
             }
         }
@@ -306,39 +407,54 @@ fun MonthHeader(
  */
 @Composable
 fun WeekHeader(
+    selectedDate: Calendar,
+    onDateSelected: (Calendar) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val calendar = Calendar.getInstance()
-    val today = calendar.get(Calendar.DAY_OF_WEEK)
+    val today = Calendar.getInstance()
+    val selectedDayOfWeek = selectedDate.get(Calendar.DAY_OF_WEEK)
 
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
         val days = listOf("월", "화", "수", "목", "금", "토", "일")
+
+        // 선택된 날짜 기준으로 주의 날짜들 계산
         val dates = (0..6).map { offset ->
             val dayCalendar = Calendar.getInstance().apply {
-                add(Calendar.DAY_OF_MONTH, offset - (today - Calendar.MONDAY))
+                timeInMillis = selectedDate.timeInMillis
+                add(Calendar.DAY_OF_MONTH, offset - (selectedDayOfWeek - Calendar.MONDAY))
             }
-            dayCalendar.get(Calendar.DAY_OF_MONTH)
+            dayCalendar
         }
 
         days.forEachIndexed { index, day ->
-            val isToday = index == (today - Calendar.MONDAY)
+            val dateCalendar = dates[index]
+            val isSelected = dateCalendar.get(Calendar.YEAR) == selectedDate.get(Calendar.YEAR) &&
+                    dateCalendar.get(Calendar.DAY_OF_YEAR) == selectedDate.get(Calendar.DAY_OF_YEAR)
+            val isToday = dateCalendar.get(Calendar.YEAR) == today.get(Calendar.YEAR) &&
+                    dateCalendar.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR)
+
             // 토요일(index=5)은 파란색, 일요일(index=6)은 빨간색
             val dayColor = when (index) {
                 5 -> Color(0xFF2196F3) // 토요일 - 파란색
                 6 -> Color(0xFFE53935) // 일요일 - 빨간색
-                else -> MaterialTheme.colorScheme.onSurface.copy(alpha = if (isToday) 1f else 0.5f)
+                else -> MaterialTheme.colorScheme.onSurface.copy(alpha = if (isSelected) 1f else 0.5f)
             }
-            
+
             Column(
                 modifier = Modifier
                     .width(40.dp)
                     .background(
-                        if (isToday) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent,
+                        when {
+                            isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                            isToday -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)
+                            else -> Color.Transparent
+                        },
                         RoundedCornerShape(8.dp)
                     )
+                    .clickable { onDateSelected(dateCalendar) }
                     .padding(vertical = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -346,13 +462,13 @@ fun WeekHeader(
                     text = day,
                     fontSize = 12.sp,
                     color = dayColor,
-                    fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                 )
                 Text(
-                    text = "${dates[index]}",
+                    text = "${dateCalendar.get(Calendar.DAY_OF_MONTH)}",
                     fontSize = 16.sp,
                     color = dayColor,
-                    fontWeight = if (isToday) FontWeight.Bold else FontWeight.Medium,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                     modifier = Modifier.padding(top = 4.dp)
                 )
             }
@@ -366,6 +482,7 @@ fun WeekHeader(
 @Composable
 fun ScheduleList(
     schedules: List<ScheduleItem>,
+    onScheduleClick: (ScheduleItem) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -389,6 +506,7 @@ fun ScheduleList(
                         MaterialTheme.colorScheme.surface,
                         RoundedCornerShape(12.dp)
                     )
+                    .clickable { onScheduleClick(schedule) }
                     .padding(2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -516,30 +634,34 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCurrentTimeHand
     val totalMinutes = hour * 60 + minute
     // 각도 계산 (0분 = -90도(12시), 360분 = 0도(3시), 시계방향)
     val angle = Math.toRadians((totalMinutes * 360.0 / 1440.0) - 90.0)
-    
+
     // 화살표 위치: 원형 테두리(radius)와 시간 텍스트(약 170dp) 사이의 빈 공간
     // 화살표 끝점 (중심쪽을 가리킴)
     val arrowTipRadius = radius + 8f // 원형 테두리 바로 안쪽
     val arrowTipX = centerX + arrowTipRadius * cos(angle).toFloat()
     val arrowTipY = centerY + arrowTipRadius * sin(angle).toFloat()
-    
+
     // 화살표 크기
     val arrowSize = 18.dp.toPx() // 화살표 높이
     val arrowWidth = 16.dp.toPx() // 화살표 밑변 너비
-    
+
     // 화살표 방향 (중심을 향하도록)
     val arrowAngle = angle + Math.PI // 180도 회전 (안쪽을 가리키도록)
-    
+
     // 화살표 밑변의 왼쪽 점
     val leftAngle = arrowAngle + Math.toRadians(90.0)
-    val arrowLeft1X = arrowTipX + arrowSize * cos(arrowAngle).toFloat() + (arrowWidth / 2) * cos(leftAngle).toFloat()
-    val arrowLeft1Y = arrowTipY + arrowSize * sin(arrowAngle).toFloat() + (arrowWidth / 2) * sin(leftAngle).toFloat()
-    
+    val arrowLeft1X =
+        arrowTipX + arrowSize * cos(arrowAngle).toFloat() + (arrowWidth / 2) * cos(leftAngle).toFloat()
+    val arrowLeft1Y =
+        arrowTipY + arrowSize * sin(arrowAngle).toFloat() + (arrowWidth / 2) * sin(leftAngle).toFloat()
+
     // 화살표 밑변의 오른쪽 점
     val rightAngle = arrowAngle - Math.toRadians(90.0)
-    val arrowRight1X = arrowTipX + arrowSize * cos(arrowAngle).toFloat() + (arrowWidth / 2) * cos(rightAngle).toFloat()
-    val arrowRight1Y = arrowTipY + arrowSize * sin(arrowAngle).toFloat() + (arrowWidth / 2) * sin(rightAngle).toFloat()
-    
+    val arrowRight1X =
+        arrowTipX + arrowSize * cos(arrowAngle).toFloat() + (arrowWidth / 2) * cos(rightAngle).toFloat()
+    val arrowRight1Y =
+        arrowTipY + arrowSize * sin(arrowAngle).toFloat() + (arrowWidth / 2) * sin(rightAngle).toFloat()
+
     // 화살표 Path 생성 (삼각형)
     val arrowPath = Path().apply {
         moveTo(arrowTipX, arrowTipY) // 화살표 끝점
@@ -547,19 +669,19 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCurrentTimeHand
         lineTo(arrowRight1X, arrowRight1Y) // 오른쪽 점
         close()
     }
-    
+
     // 화살표 그림자 효과 (약간 큰 검은색 화살표)
     drawPath(
         path = arrowPath,
         color = Color.Black.copy(alpha = 0.2f)
     )
-    
+
     // 화살표 그리기 (밝은 빨간색)
     drawPath(
         path = arrowPath,
         color = Color(0xFFFF5252)
     )
-    
+
     // 화살표 테두리 (흰색으로 강조)
     drawPath(
         path = arrowPath,
@@ -582,21 +704,21 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawScheduleSector(
     // 시작 시간과 종료 시간을 분 단위로 계산
     val startMinutes = schedule.startHour * 60 + schedule.startMinute
     val endMinutes = schedule.endHour * 60 + schedule.endMinute
-    
+
     // 각도 계산: 0분 = -90도(12시), 360분 = 0도(3시), 720분 = 90도(6시), 1080분 = 180도(9시)
     var startAngle = (startMinutes * 360f / 1440f) - 90f
     var endAngle = (endMinutes * 360f / 1440f) - 90f
-    
+
     // 종료 시간이 시작 시간보다 작거나 같으면 자정을 넘어간 경우이므로 360도를 더함
     // 분 단위로 비교하는 것이 더 정확함
     if (endMinutes <= startMinutes) {
         endAngle += 360f
     }
-    
+
     // 각도를 0-360도 범위로 정규화 (arcTo가 음수 각도를 제대로 처리하지 못할 수 있음)
     startAngle = ((startAngle % 360f) + 360f) % 360f
     endAngle = ((endAngle % 360f) + 360f) % 360f
-    
+
     // 스윕 각도 계산 (항상 양수, 0-360도 범위 내에서)
     val sweepAngle = if (endAngle >= startAngle) {
         endAngle - startAngle
@@ -608,13 +730,13 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawScheduleSector(
     val totalDuration = 1000f
     val delayedStart = delay.toFloat()
     val animationDuration = totalDuration - delayedStart
-    
+
     val progress = if (animatedProgress * totalDuration < delayedStart) {
         0f // 아직 시작 안 함
     } else {
         ((animatedProgress * totalDuration - delayedStart) / animationDuration).coerceIn(0f, 1f)
     }
-    
+
     val animatedSweepAngle = sweepAngle * progress
 
     val path = Path().apply {
@@ -666,23 +788,23 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawScheduleText(
     val totalDuration = 1000f
     val delayedStart = delay.toFloat()
     val animationDuration = totalDuration - delayedStart
-    
+
     val progress = if (animatedProgress * totalDuration < delayedStart) {
         0f // 아직 시작 안 함
     } else {
         ((animatedProgress * totalDuration - delayedStart) / animationDuration).coerceIn(0f, 1f)
     }
-    
+
     if (progress < 0.7f) return
 
     // 시작 시간과 종료 시간을 분 단위로 계산
     val startMinutes = schedule.startHour * 60 + schedule.startMinute
     val endMinutes = schedule.endHour * 60 + schedule.endMinute
-    
+
     // 각도 계산
     val startAngle = (startMinutes * 360f / 1440f) - 90f
     var endAngle = (endMinutes * 360f / 1440f) - 90f
-    
+
     // 종료 시간이 시작 시간보다 작거나 같으면 자정을 넘어간 경우이므로 360도를 더함
     // 분 단위로 비교하는 것이 더 정확함
     if (endMinutes <= startMinutes) {
@@ -723,7 +845,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawScheduleText(
 
     // 텍스트를 한 줄로만 표시 (줄바꿈 없음)
     fun measureTextWidth(s: String): Float = paint.measureText(s)
-    
+
     // 텍스트가 너무 길면 자르기
     var text = schedule.title
     if (measureTextWidth(text) > maxTextWidth) {
@@ -741,10 +863,10 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawScheduleText(
     drawIntoCanvas { canvas ->
         val native = canvas.nativeCanvas
         native.save()
-        
+
         // 텍스트 위치로 이동
         native.translate(px, py)
-        
+
         // 섹터의 중간 각도 방향으로 텍스트 회전
         // timeToAngle: -90도 = 12시, 0도 = 3시, 90도 = 6시, 180도 = 9시
         // Android Canvas rotate: 0도 = 오른쪽(3시), 90도 = 아래쪽(6시), -90도 = 위쪽(12시)
