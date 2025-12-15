@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -86,6 +87,7 @@ fun CircularDayView(
     val isToday = selectedDate.get(Calendar.YEAR) == today.get(Calendar.YEAR) &&
             selectedDate.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR)
 
+    // 애니메이션은 초기 로드시에만 실행
     val animatedProgress by animateFloatAsState(
         targetValue = 1f,
         animationSpec = tween(
@@ -95,13 +97,13 @@ fun CircularDayView(
         label = "circular_view_animation"
     )
 
-    // 현재 시간을 추적하여 분침을 움직이게 함
+    // 현재 시간을 추적하여 분침을 움직이게 함 (1분마다만 업데이트)
     var currentTimeMillis by remember { mutableStateOf(System.currentTimeMillis()) }
 
     LaunchedEffect(Unit) {
         while (true) {
+            delay(60000) // 1분마다 업데이트 (1초에서 60초로 변경)
             currentTimeMillis = System.currentTimeMillis()
-            delay(1000) // 1초마다 업데이트
         }
     }
 
@@ -141,9 +143,64 @@ fun CircularDayView(
                 .weight(1f),
             contentAlignment = Alignment.Center
         ) {
+            // 정적 배경과 마커를 별도의 Canvas로 분리 (schedules 변경 시 재그리기 방지)
+            val canvasModifier = Modifier.size(340.dp)
+            
+            // 배경 및 시간 마커 Canvas (정적 콘텐츠)
             Canvas(
-                modifier = Modifier
-                    .size(340.dp)
+                modifier = canvasModifier
+            ) {
+                val centerX = size.width / 2
+                val centerY = size.height / 2
+                val outerRadius = minOf(centerX, centerY) - 50f
+                val borderWidth = 2.5.dp.toPx()
+                val innerRadius = outerRadius - borderWidth
+
+                // 외곽 원형 배경 (밝은 회색)
+                drawCircle(
+                    color = Color.LightGray,
+                    radius = outerRadius,
+                    center = Offset(centerX, centerY)
+                )
+
+                // 내부 배경 (약간 더 진한 회색)
+                drawCircle(
+                    color = Color(0xFFF3F4F6),
+                    radius = innerRadius,
+                    center = Offset(centerX, centerY)
+                )
+
+                // 시간 표시선 그리기 (24시간)
+                for (hour in 0..23) {
+                    drawHourMarker(
+                        centerX = centerX,
+                        centerY = centerY,
+                        radius = innerRadius,
+                        hour = hour,
+                        animatedProgress = 1f, // 항상 완전히 표시
+                        onSurfaceColor = onSurfaceColor
+                    )
+                }
+
+                // 분 표시선 그리기 (15, 30, 45분)
+                for (hour in 0..23) {
+                    for (minute in listOf(15, 30, 45)) {
+                        drawMinuteMarker(
+                            centerX = centerX,
+                            centerY = centerY,
+                            radius = innerRadius,
+                            hour = hour,
+                            minute = minute,
+                            animatedProgress = 1f, // 항상 완전히 표시
+                            onSurfaceColor = onSurfaceColor
+                        )
+                    }
+                }
+            }
+            
+            // 일정 섹터 Canvas (동적 콘텐츠)
+            Canvas(
+                modifier = canvasModifier
                     .pointerInput(schedules) {
                         detectTapGestures { offset ->
                             // 클릭 위치 확인
@@ -169,25 +226,10 @@ fun CircularDayView(
                 val centerX = size.width / 2
                 val centerY = size.height / 2
                 val outerRadius = minOf(centerX, centerY) - 50f
-                // 흰색 테두리 크기(2.5dp)만큼만 간격 두기
                 val borderWidth = 2.5.dp.toPx()
-                val innerRadius = outerRadius - borderWidth // 시간 텍스트 전까지
+                val innerRadius = outerRadius - borderWidth
 
-                // 외곽 원형 배경 (밝은 회색)
-                drawCircle(
-                    color = Color.LightGray,
-                    radius = outerRadius,
-                    center = Offset(centerX, centerY)
-                )
-
-                // 내부 배경 (약간 더 진한 회색)
-                drawCircle(
-                    color = Color(0xFFF3F4F6),
-                    radius = innerRadius,
-                    center = Offset(centerX, centerY)
-                )
-
-                // 일정 섹터 그리기
+                // 일정 섹터 그리기만 (배경과 마커는 별도 Canvas에서 처리)
                 schedules.forEachIndexed { index, schedule ->
                     drawScheduleSector(
                         centerX = centerX,
@@ -206,58 +248,42 @@ fun CircularDayView(
                     center = Offset(centerX, centerY),
                     style = Stroke(width = 2.5.dp.toPx())
                 )
+            }
+            
+            // 현재 시간 표시 Canvas (1분마다 업데이트)
+            key(currentTimeMillis) {
+                Canvas(modifier = canvasModifier) {
+                    val centerX = size.width / 2
+                    val centerY = size.height / 2
+                    val outerRadius = minOf(centerX, centerY) - 50f
+                    val borderWidth = 2.5.dp.toPx()
+                    val innerRadius = outerRadius - borderWidth
 
-                // 시간 표시선 그리기
-                for (hour in 0..23) {
-                    drawHourMarker(
+                    // 현재 시간 분침 그리기
+                    val calendar = Calendar.getInstance().apply {
+                        timeInMillis = currentTimeMillis
+                    }
+                    val currentHour = calendar.get(Calendar.HOUR_OF_DAY)
+                    val currentMinute = calendar.get(Calendar.MINUTE)
+
+                    drawCurrentTimeHand(
                         centerX = centerX,
                         centerY = centerY,
                         radius = innerRadius,
-                        hour = hour,
-                        animatedProgress = animatedProgress,
+                        hour = currentHour,
+                        minute = currentMinute,
                         onSurfaceColor = onSurfaceColor
                     )
                 }
-
-                // 분 표시선 그리기
-                for (hour in 0..23) {
-                    for (minute in listOf(15, 30, 45)) {
-                        drawMinuteMarker(
-                            centerX = centerX,
-                            centerY = centerY,
-                            radius = innerRadius,
-                            hour = hour,
-                            minute = minute,
-                            animatedProgress = animatedProgress,
-                            onSurfaceColor = onSurfaceColor
-                        )
-                    }
-                }
-
-                // 현재 시간 분침 그리기
-                val calendar = Calendar.getInstance().apply {
-                    timeInMillis = currentTimeMillis
-                }
-                val currentHour = calendar.get(Calendar.HOUR_OF_DAY)
-                val currentMinute = calendar.get(Calendar.MINUTE)
-
-                drawCurrentTimeHand(
-                    centerX = centerX,
-                    centerY = centerY,
-                    radius = innerRadius,
-                    hour = currentHour,
-                    minute = currentMinute,
-                    onSurfaceColor = onSurfaceColor
-                )
             }
 
             // 시간 텍스트 표시 (원형 가장자리 가까이, 진하게)
             // 흰색 테두리 크기(2.5dp)만큼만 간격 두기
             val borderWidthPx = 2.5.dp.value
+            val radius = 170.dp.value // 애니메이션 완료 후에는 항상 고정값 사용
             for (hour in 0..23) {
                 val angle = Math.toRadians((hour * 15.0) - 90.0)
-                val radius = 170.dp.value * animatedProgress
-                val textX = (radius - borderWidthPx) * cos(angle).toFloat() // 흰색 테두리 크기만큼만
+                val textX = (radius - borderWidthPx) * cos(angle).toFloat()
                 val textY = (radius - borderWidthPx) * sin(angle).toFloat()
 
                 Text(
@@ -272,27 +298,28 @@ fun CircularDayView(
             }
 
             // 일정 텍스트를 섹터 안에 중앙에 배치 (섹터 아크를 따라 회전)
-            Canvas(
-                modifier = Modifier
-                    .size(340.dp)
-            ) {
-                val centerX = size.width / 2
-                val centerY = size.height / 2
-                val outerRadius = minOf(centerX, centerY) - 50f
-                // 흰색 테두리 크기(2.5dp)만큼만 간격 두기
-                val borderWidth = 2.5.dp.toPx()
-                val innerRadius = outerRadius - borderWidth // 시간 텍스트 전까지
+            // animatedProgress가 1.0에 도달한 후에만 그리기 (애니메이션 완료 후)
+            if (animatedProgress >= 0.99f) {
+                Canvas(
+                    modifier = Modifier.size(340.dp)
+                ) {
+                    val centerX = size.width / 2
+                    val centerY = size.height / 2
+                    val outerRadius = minOf(centerX, centerY) - 50f
+                    val borderWidth = 2.5.dp.toPx()
+                    val innerRadius = outerRadius - borderWidth
 
-                schedules.forEachIndexed { index, schedule ->
-                    drawScheduleText(
-                        centerX = centerX,
-                        centerY = centerY,
-                        radius = innerRadius,
-                        schedule = schedule,
-                        animatedProgress = animatedProgress,
-                        delay = index * 100,
-                        onSurfaceColor = onSurfaceColor
-                    )
+                    schedules.forEachIndexed { index, schedule ->
+                        drawScheduleText(
+                            centerX = centerX,
+                            centerY = centerY,
+                            radius = innerRadius,
+                            schedule = schedule,
+                            animatedProgress = 1f, // 항상 완전히 표시
+                            delay = 0, // 딜레이 없음
+                            onSurfaceColor = onSurfaceColor
+                        )
+                    }
                 }
             }
             
@@ -710,15 +737,11 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawScheduleSector(
         endAngle + 360f - startAngle
     }.coerceAtLeast(0.1f) // 최소 0.1도 보장
 
-    // 애니메이션 진행도 계산 (delay를 고려하되, 최종적으로는 1.0이 되도록)
-    val totalDuration = 1000f
-    val delayedStart = delay.toFloat()
-    val animationDuration = totalDuration - delayedStart
-
-    val progress = if (animatedProgress * totalDuration < delayedStart) {
-        0f // 아직 시작 안 함
+    // 애니메이션 진행도 계산 최적화 (간단한 계산으로 변경)
+    val progress = if (delay == 0) {
+        animatedProgress
     } else {
-        ((animatedProgress * totalDuration - delayedStart) / animationDuration).coerceIn(0f, 1f)
+        ((animatedProgress - (delay / 1000f)) / (1f - (delay / 1000f))).coerceIn(0f, 1f)
     }
 
     val animatedSweepAngle = sweepAngle * progress
@@ -768,18 +791,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawScheduleText(
     delay: Int = 0,
     onSurfaceColor: Color
 ) {
-    // 애니메이션 진행도 계산 (delay를 고려하되, 최종적으로는 1.0이 되도록)
-    val totalDuration = 1000f
-    val delayedStart = delay.toFloat()
-    val animationDuration = totalDuration - delayedStart
-
-    val progress = if (animatedProgress * totalDuration < delayedStart) {
-        0f // 아직 시작 안 함
-    } else {
-        ((animatedProgress * totalDuration - delayedStart) / animationDuration).coerceIn(0f, 1f)
-    }
-
-    if (progress < 0.7f) return
+    // 애니메이션이 완료된 상태에서만 호출되므로 progress 체크 불필요
 
     // 시작 시간과 종료 시간을 분 단위로 계산
     val startMinutes = schedule.startHour * 60 + schedule.startMinute

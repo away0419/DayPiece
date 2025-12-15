@@ -110,13 +110,9 @@ fun DayPieceScreen(
     // 선택된 날짜 상태
     var selectedDate by remember { mutableStateOf(Calendar.getInstance()) }
     
-    // 선택된 날짜의 일정만 필터링
+    // 선택된 날짜의 일정만 필터링 (remember로 캐싱)
     val filteredSchedules = remember(selectedDate, viewModel.schedules.size) {
-        viewModel.schedules.filter { schedule ->
-            // 현재는 날짜 필터링 없이 모든 일정 표시
-            // 추후 날짜별 일정 관리 기능 추가 시 여기서 필터링
-            true
-        }
+        viewModel.schedules.toList() // 불변 리스트로 변환하여 안정적인 참조 유지
     }
     
     // 다이얼로그 상태

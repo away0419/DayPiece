@@ -6,9 +6,7 @@ plugins {
 
 android {
     namespace = "com.example.daypiece"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.daypiece"
@@ -22,11 +20,16 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        debug {
+            // 디버그 빌드에서도 최소한의 최적화 적용
+            isMinifyEnabled = false
         }
     }
     compileOptions {
@@ -35,9 +38,20 @@ android {
     }
     kotlinOptions {
         jvmTarget = "11"
+        // Compose 성능 최적화를 위한 컴파일러 옵션
+        freeCompilerArgs += listOf(
+            "-opt-in=kotlin.RequiresOptIn",
+            "-Xjvm-default=all"
+        )
     }
     buildFeatures {
         compose = true
+        buildConfig = false
+    }
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
     }
 }
 
