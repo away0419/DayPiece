@@ -69,6 +69,9 @@ dependencies {
     // ViewModel Compose 의존성
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     
+    // Gson for JSON serialization (데이터 저장용)
+    implementation("com.google.code.gson:gson:2.10.1")
+    
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
