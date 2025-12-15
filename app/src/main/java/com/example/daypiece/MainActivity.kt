@@ -18,7 +18,7 @@ import com.example.daypiece.model.ScheduleItem
 import com.example.daypiece.ui.components.CircularDayView
 import com.example.daypiece.ui.components.ScheduleDetailDialog
 import com.example.daypiece.ui.components.ScheduleEditDialog
-import com.example.daypiece.ui.screens.ScheduleAddScreen
+import com.example.daypiece.ui.screens.ScheduleAddScreenNew
 import com.example.daypiece.ui.theme.DayPieceTheme
 import com.example.daypiece.ui.theme.ScheduleBlue
 import com.example.daypiece.ui.theme.ScheduleGreen
@@ -91,9 +91,10 @@ fun DayPieceScreen(
                 modifier = Modifier.fillMaxSize()
             )
         } else {
-            // 일정 추가 화면
-            ScheduleAddScreen(
+            // 일정 추가 화면 (새 버전)
+            ScheduleAddScreenNew(
                 selectedDate = selectedDate,
+                existingSchedules = filteredSchedules,
                 onSave = { newSchedule ->
                     viewModel.addSchedule(newSchedule)
                     showAddScheduleScreen = false
