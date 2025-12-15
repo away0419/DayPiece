@@ -17,6 +17,8 @@ import androidx.compose.ui.unit.sp
 import com.example.daypiece.model.ScheduleAttribute
 import com.example.daypiece.model.ScheduleItem
 import com.example.daypiece.ui.theme.*
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 /**
  * 일정 추가 화면
@@ -24,6 +26,7 @@ import com.example.daypiece.ui.theme.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScheduleAddScreen(
+    selectedDate: java.util.Calendar,
     onSave: (ScheduleItem) -> Unit,
     onCancel: () -> Unit
 ) {
@@ -279,7 +282,12 @@ fun ScheduleAddScreen(
                         if (isHabit) attributes.add(ScheduleAttribute.HABIT)
                         if (hasAlarm) attributes.add(ScheduleAttribute.ALARM)
                         
+                        // 선택된 날짜를 yyyy-MM-dd 형식으로 변환
+                        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                        val dateString = dateFormat.format(selectedDate.time)
+                        
                         val newSchedule = ScheduleItem(
+                            date = dateString,
                             title = title,
                             startHour = startHour,
                             startMinute = startMinute,

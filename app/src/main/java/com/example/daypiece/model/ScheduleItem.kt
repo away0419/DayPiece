@@ -11,6 +11,7 @@ enum class ScheduleAttribute {
 /**
  * 일정 아이템 데이터 모델
  * @param id 일정 고유 ID
+ * @param date 일정 날짜 (yyyy-MM-dd 형식)
  * @param title 일정 제목
  * @param startHour 시작 시간 (시)
  * @param startMinute 시작 시간 (분)
@@ -22,6 +23,7 @@ enum class ScheduleAttribute {
  */
 data class ScheduleItem(
     val id: String = java.util.UUID.randomUUID().toString(),
+    val date: String, // yyyy-MM-dd 형식
     val title: String,
     val startHour: Int,
     val startMinute: Int,

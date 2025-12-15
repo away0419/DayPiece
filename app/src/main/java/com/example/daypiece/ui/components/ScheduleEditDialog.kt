@@ -303,6 +303,7 @@ fun ScheduleEditDialog(
                             
                             val newSchedule = ScheduleItem(
                                 id = schedule?.id ?: java.util.UUID.randomUUID().toString(),
+                                date = schedule?.date ?: "", // 기존 날짜 유지
                                 title = title,
                                 startHour = startHour,
                                 startMinute = startMinute,

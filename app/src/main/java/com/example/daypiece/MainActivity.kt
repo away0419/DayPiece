@@ -50,69 +50,12 @@ fun DayPieceScreen(
     modifier: Modifier = Modifier,
     viewModel: ScheduleViewModel = viewModel()
 ) {
-    // 샘플 일정 데이터 생성 (초기 로드)
-    LaunchedEffect(Unit) {
-        if (viewModel.schedules.isEmpty()) {
-            val sampleSchedules = listOf(
-                ScheduleItem(
-                    title = "잠",
-                    startHour = 23,
-                    startMinute = 0,
-                    endHour = 5,
-                    endMinute = 30,
-                    color = SchedulePurple
-                ),
-                ScheduleItem(
-                    title = "헬스",
-                    startHour = 5,
-                    startMinute = 30,
-                    endHour = 7,
-                    endMinute = 0,
-                    color = ScheduleGreen
-                ),
-                ScheduleItem(
-                    title = "아침식사 및 출근준비",
-                    startHour = 7,
-                    startMinute = 0,
-                    endHour = 8,
-                    endMinute = 0,
-                    color = ScheduleOrange
-                ),
-                ScheduleItem(
-                    title = "출근",
-                    startHour = 8,
-                    startMinute = 0,
-                    endHour = 9,
-                    endMinute = 0,
-                    color = ScheduleBlue
-                ),
-                ScheduleItem(
-                    title = "회사",
-                    startHour = 9,
-                    startMinute = 0,
-                    endHour = 18,
-                    endMinute = 0,
-                    color = ScheduleTeal
-                ),
-                ScheduleItem(
-                    title = "자유시간",
-                    startHour = 18,
-                    startMinute = 0,
-                    endHour = 23,
-                    endMinute = 0,
-                    color = ScheduleRed
-                )
-            )
-            viewModel.loadSampleData(sampleSchedules)
-        }
-    }
-
     // 선택된 날짜 상태
     var selectedDate by remember { mutableStateOf(Calendar.getInstance()) }
     
     // 선택된 날짜의 일정만 필터링 (remember로 캐싱)
-    val filteredSchedules = remember(selectedDate, viewModel.schedules.size) {
-        viewModel.schedules.toList() // 불변 리스트로 변환하여 안정적인 참조 유지
+    val filteredSchedules = remember(selectedDate, viewModel.schedulesByDate.size) {
+        viewModel.getSchedulesForDate(selectedDate)
     }
     
     // 다이얼로그 상태
@@ -150,6 +93,7 @@ fun DayPieceScreen(
         } else {
             // 일정 추가 화면
             ScheduleAddScreen(
+                selectedDate = selectedDate,
                 onSave = { newSchedule ->
                     viewModel.addSchedule(newSchedule)
                     showAddScheduleScreen = false
