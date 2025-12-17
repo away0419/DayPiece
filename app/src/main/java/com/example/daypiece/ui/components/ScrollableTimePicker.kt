@@ -40,13 +40,13 @@ fun ScrollableTimePicker(
     otherTime: Pair<Int, Int>?, // (hour, minute)
     modifier: Modifier = Modifier
 ) {
-    // 순환 스크롤을 위한 큰 아이템 수 (시간: 24 * 1000, 분: 6 * 1000)
+    // 순환 스크롤을 위한 큰 아이템 수 (시간: 24 * 1000, 분: 12 * 1000)
     val hourItemCount = 24 * 1000
-    val minuteItemCount = 6 * 1000
+    val minuteItemCount = 12 * 1000
     
     // 중간에서 시작
     val hourInitialIndex = hourItemCount / 2 + selectedHour
-    val minuteInitialIndex = minuteItemCount / 2 + (selectedMinute / 10)
+    val minuteInitialIndex = minuteItemCount / 2 + (selectedMinute / 5)
     
     val hourListState = rememberLazyListState(initialFirstVisibleItemIndex = hourInitialIndex)
     val minuteListState = rememberLazyListState(initialFirstVisibleItemIndex = minuteInitialIndex)
@@ -95,7 +95,9 @@ fun ScrollableTimePicker(
                         val centerItem = layoutInfo.visibleItemsInfo.minByOrNull {
                             kotlin.math.abs((it.offset + it.size / 2) - viewportCenter)
                         }
-                        val isSelected = index == centerItem?.index
+                        // 실제 시간 값으로 선택 여부 판단
+                        val centerHour = if (centerItem != null) centerItem.index % 24 else selectedHour
+                        val isSelected = hour == centerHour
                         
                         val isAvailable = isTimeAvailable(
                             hour = hour,
@@ -129,7 +131,7 @@ fun ScrollableTimePicker(
                 modifier = Modifier.padding(horizontal = 8.dp)
             )
             
-            // 분 선택 (10분 단위, 순환 구조)
+            // 분 선택 (5분 단위, 순환 구조)
             Box(modifier = Modifier.width(60.dp).height(150.dp)) {
                 LazyColumn(
                     state = minuteListState,
@@ -139,14 +141,16 @@ fun ScrollableTimePicker(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     items(minuteItemCount) { index ->
-                        val minute = (index % 6) * 10
+                        val minute = (index % 12) * 5
                         // 중앙에 있는 항목 계산 (contentPadding 50dp 고려)
                         val layoutInfo = minuteListState.layoutInfo
                         val viewportCenter = layoutInfo.viewportStartOffset + layoutInfo.viewportSize.height / 2
                         val centerItem = layoutInfo.visibleItemsInfo.minByOrNull {
                             kotlin.math.abs((it.offset + it.size / 2) - viewportCenter)
                         }
-                        val isSelected = index == centerItem?.index
+                        // 실제 분 값으로 선택 여부 판단
+                        val centerMinute = if (centerItem != null) (centerItem.index % 12) * 5 else selectedMinute
+                        val isSelected = minute == centerMinute
                         
                         val isAvailable = isTimeAvailable(
                             hour = selectedHour,
@@ -196,7 +200,7 @@ fun ScrollableTimePicker(
                 }
                 
                 val newHour = (hourCenterItem?.index ?: hourInitialIndex) % 24
-                val newMinute = ((minuteCenterItem?.index ?: minuteInitialIndex) % 6) * 10
+                val newMinute = ((minuteCenterItem?.index ?: minuteInitialIndex) % 12) * 5
                 
                 // 선택 가능한 시간인지 확인
                 if (isTimeAvailable(newHour, newMinute, availableRange)) {
@@ -207,7 +211,7 @@ fun ScrollableTimePicker(
                     // 선택 불가능한 시간이면 가까운 유효한 시간으로 이동
                     val validTime = findNearestValidTime(newHour, newMinute, availableRange)
                     val validHourIndex = hourItemCount / 2 + validTime.first
-                    val validMinuteIndex = minuteItemCount / 2 + (validTime.second / 10)
+                    val validMinuteIndex = minuteItemCount / 2 + (validTime.second / 5)
                     hourListState.animateScrollToItem(validHourIndex)
                     minuteListState.animateScrollToItem(validMinuteIndex)
                     onTimeChange(validTime.first, validTime.second)
@@ -216,7 +220,7 @@ fun ScrollableTimePicker(
         }
     }
     
-    // 선택된 시간으로 초기화
+    // 선택된 시간으로 초기화 (드래그 연동)
     LaunchedEffect(selectedHour, selectedMinute) {
         if (!hourListState.isScrollInProgress && !minuteListState.isScrollInProgress) {
             val currentHourCenter = hourListState.layoutInfo.visibleItemsInfo.minByOrNull {
@@ -229,14 +233,14 @@ fun ScrollableTimePicker(
             }
             
             val currentHour = (currentHourCenter?.index ?: hourInitialIndex) % 24
-            val currentMinute = ((currentMinuteCenter?.index ?: minuteInitialIndex) % 6) * 10
+            val currentMinute = ((currentMinuteCenter?.index ?: minuteInitialIndex) % 12) * 5
             
             if (currentHour != selectedHour) {
                 val targetIndex = hourItemCount / 2 + selectedHour
                 hourListState.scrollToItem(targetIndex)
             }
             if (currentMinute != selectedMinute) {
-                val targetIndex = minuteItemCount / 2 + (selectedMinute / 10)
+                val targetIndex = minuteItemCount / 2 + (selectedMinute / 5)
                 minuteListState.scrollToItem(targetIndex)
             }
         }
@@ -268,6 +272,7 @@ private fun calculateAvailableTimeRange(
         
         for (minute in 0..1440) {
             if (minute == 1440 || occupiedMinutes.contains(minute)) {
+                // 최소 1분 이상의 범위만 추가
                 if (minute > rangeStart) {
                     availableRanges.add(rangeStart to minute)
                 }
@@ -285,11 +290,10 @@ private fun calculateAvailableTimeRange(
         val availableRanges = mutableListOf<Pair<Int, Int>>()
         
         // 시작 시간 이후부터 다음 날 시작 시간 전까지 확인 (최대 24시간)
-        var currentMinute = startMinutes
         var rangeStart = startMinutes
         
         for (offset in 1..1440) {
-            currentMinute = (startMinutes + offset) % 1440
+            val currentMinute = (startMinutes + offset) % 1440
             
             if (occupiedMinutes.contains(currentMinute)) {
                 // 기존 일정을 만나면 그 전까지가 선택 가능 범위
@@ -299,24 +303,40 @@ private fun calculateAvailableTimeRange(
                     if (rangeStart < 1440 && rangeEnd < rangeStart) {
                         // 자정을 넘는 경우: 두 개의 범위로 분리
                         availableRanges.add(rangeStart to 1440)
-                        availableRanges.add(0 to rangeEnd)
-                    } else {
+                        // 빈 범위가 아닌 경우만 추가
+                        if (rangeEnd > 0) {
+                            availableRanges.add(0 to rangeEnd)
+                        }
+                    } else if (rangeEnd > rangeStart) {
+                        // 최소 1분 이상의 범위만 추가
                         availableRanges.add(rangeStart to rangeEnd)
                     }
                 }
                 break
             }
             
-            // 전체 24시간을 순회했으면 종료
+            // 전체 24시간을 순회했으면 종료 (occupied가 없는 경우)
             if (offset == 1440) {
                 val rangeEnd = (startMinutes + 1440) % 1440
-                if (rangeStart < 1440 && rangeEnd < rangeStart) {
+                if (rangeEnd == rangeStart) {
+                    // 전체 24시간이 available (한 바퀴 돌아서 시작점으로 돌아옴)
+                    if (rangeStart > 0) {
+                        // 자정을 넘는 경우: rangeStart ~ 1440, 0 ~ rangeStart
+                        availableRanges.add(rangeStart to 1440)
+                        availableRanges.add(0 to rangeStart)
+                    } else {
+                        // rangeStart가 0인 경우: 0 ~ 1440 전체
+                        availableRanges.add(0 to 1440)
+                    }
+                } else if (rangeStart < 1440 && rangeEnd < rangeStart) {
                     // 자정을 넘는 경우
                     availableRanges.add(rangeStart to 1440)
+                    // 빈 범위가 아닌 경우만 추가
                     if (rangeEnd > 0) {
                         availableRanges.add(0 to rangeEnd)
                     }
-                } else {
+                } else if (rangeEnd > rangeStart) {
+                    // 최소 1분 이상의 범위만 추가
                     availableRanges.add(rangeStart to rangeEnd)
                 }
             }
@@ -360,10 +380,18 @@ private fun findNearestValidTime(
     }
     
     return if (nearestRange != null) {
-        val validMinute = totalMinutes.coerceIn(nearestRange.first, nearestRange.second - 1)
-        (validMinute / 60) to (validMinute % 60)
+        // 범위가 유효한지 확인 (최소 1분 이상)
+        val rangeEnd = nearestRange.second - 1
+        if (rangeEnd < nearestRange.first) {
+            // 빈 범위인 경우 범위의 시작 시간 반환
+            (nearestRange.first / 60) to (nearestRange.first % 60)
+        } else {
+            val validMinute = totalMinutes.coerceIn(nearestRange.first, rangeEnd)
+            (validMinute / 60) to (validMinute % 60)
+        }
     } else {
-        0 to 0
+        // 사용 가능한 범위가 없는 경우 현재 시간 그대로 반환
+        hour to minute
     }
 }
 

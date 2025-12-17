@@ -41,10 +41,10 @@ fun ScheduleAddScreenNew(
 ) {
     // 입력 상태
     var title by remember { mutableStateOf("") }
-    var startHour by remember { mutableStateOf(0) }
+    var startHour by remember { mutableStateOf(9) } // 초기값 변경 (00:00 선택 가능하도록)
     var startMinute by remember { mutableStateOf(0) }
-    var endHour by remember { mutableStateOf(0) }
-    var endMinute by remember { mutableStateOf(10) }
+    var endHour by remember { mutableStateOf(10) } // 초기값 변경
+    var endMinute by remember { mutableStateOf(0) }
     var description by remember { mutableStateOf("") }
     var selectedColor by remember { mutableStateOf(ScheduleBlue) }
     var isHabit by remember { mutableStateOf(false) }
@@ -98,92 +98,37 @@ fun ScheduleAddScreenNew(
                 startMinute = start % 60
                 endHour = end / 60
                 endMinute = end % 60
+                // 상태 업데이트가 완전히 반영될 때까지 플래그 유지
+                kotlinx.coroutines.delay(200)
                 isUpdatingFromDrag = false
             }
         }
     }
     
-    // 시작 시간이 변경되면 종료 시간 자동 조정 및 드래그 범위 업데이트
-    LaunchedEffect(startHour, startMinute) {
-        if (!isUpdatingFromDrag && isInitialized) {
-            isUpdatingFromPicker = true
-            
-            val startMinutes = startHour * 60 + startMinute
-            val endMinutes = endHour * 60 + endMinute
-            
-            // 시작 시간이 기존 일정과 겹치면 이전으로 되돌림
-            if (isTimeOccupied(startMinutes)) {
-                // 이전 값으로 복원하거나 가능한 시간으로 조정
-                // 여기서는 단순히 무시
-            } else {
-                // 자정을 넘는지 확인
-                val crossesMidnight = endMinutes < startMinutes
-                
-                // 종료 시간이 기존 일정을 넘어가는지 확인
-                if (!crossesMidnight) {
-                    // 같은 날 내에서 확인
-                    val nextSchedule = findNextScheduleStart(startMinutes)
-                    if (nextSchedule != null && endMinutes >= nextSchedule) {
-                        // 다음 일정 전으로 종료 시간 조정
-                        endHour = nextSchedule / 60
-                        endMinute = nextSchedule % 60
-                    }
-                }
-                
-                selectedTimeRange = startMinutes to (endHour * 60 + endMinute)
-            }
-            
-            isUpdatingFromPicker = false
-        }
-    }
-    
-    // 종료 시간이 변경되면 자동 조정 및 드래그 범위 업데이트
-    LaunchedEffect(endHour, endMinute) {
-        if (!isUpdatingFromDrag && isInitialized) {
-            isUpdatingFromPicker = true
-            
-            val startMinutes = startHour * 60 + startMinute
-            val endMinutes = endHour * 60 + endMinute
-            
-            // 종료 시간이 시작 시간보다 작으면 자정을 넘는 것으로 간주
-            // 단, 드래그가 아닌 직접 입력일 때만 최소 10분 보장
-            val crossesMidnight = endMinutes < startMinutes
-            
-            if (!crossesMidnight && endMinutes <= startMinutes) {
-                // 같은 날 + 종료가 시작보다 작거나 같으면 최소 10분 보장
-                endHour = startHour
-                endMinute = startMinute + 10
-                if (endMinute >= 60) {
-                    endHour = (endHour + 1) % 24
-                    endMinute = endMinute % 60
-                }
-            }
-            
-            // 종료 시간이 기존 일정과 겹치는지 확인
-            val nextSchedule = findNextScheduleStart(startMinutes)
-            if (nextSchedule != null && !crossesMidnight) {
-                // 자정을 넘지 않는 경우에만 다음 일정 체크
-                val proposedEndMinutes = endHour * 60 + endMinute
-                if (proposedEndMinutes > nextSchedule) {
-                    // 다음 일정을 넘어가면 다음 일정 시작 시간으로 조정
-                    endHour = nextSchedule / 60
-                    endMinute = nextSchedule % 60
-                }
-            }
-            
-            val adjustedEndMinutes = endHour * 60 + endMinute
-            // 자정을 넘거나 종료가 시작보다 크면 유효한 범위
-            if (adjustedEndMinutes > startMinutes || (adjustedEndMinutes < startMinutes && crossesMidnight)) {
-                selectedTimeRange = startMinutes to adjustedEndMinutes
-            }
-            
-            isUpdatingFromPicker = false
+    // 시작/종료 시간이 변경되면 드래그 범위 업데이트
+    LaunchedEffect(startHour, startMinute, endHour, endMinute) {
+        // 초기화 전이거나 드래그 중이면 스킵
+        if (!isInitialized || isUpdatingFromDrag) {
+            return@LaunchedEffect
         }
         
-        // 첫 로드 후 초기화 플래그 설정
-        if (!isInitialized) {
-            isInitialized = true
-        }
+        // Picker 업데이트로 인한 변경임을 표시
+        isUpdatingFromPicker = true
+        
+        val startMinutes = startHour * 60 + startMinute
+        val endMinutes = endHour * 60 + endMinute
+        
+        // selectedTimeRange 업데이트 (사용자가 선택한 값 그대로)
+        selectedTimeRange = startMinutes to endMinutes
+        
+        kotlinx.coroutines.delay(100)
+        isUpdatingFromPicker = false
+    }
+    
+    // 초기화 플래그 설정 (한 번만 실행)
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(100)
+        isInitialized = true
     }
     
     // 색상 팔레트
@@ -440,7 +385,7 @@ fun ScheduleAddScreenNew(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp),
-                    enabled = title.isNotBlank() && endHour * 60 + endMinute > startHour * 60 + startMinute,
+                    enabled = title.isNotBlank() && (endHour * 60 + endMinute != startHour * 60 + startMinute),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(

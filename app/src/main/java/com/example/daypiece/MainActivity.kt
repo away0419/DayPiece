@@ -53,8 +53,9 @@ fun DayPieceScreen(
     // 선택된 날짜 상태
     var selectedDate by remember { mutableStateOf(Calendar.getInstance()) }
     
-    // 선택된 날짜의 일정만 필터링 (remember로 캐싱)
-    val filteredSchedules = remember(selectedDate, viewModel.schedulesByDate.size) {
+    // 선택된 날짜의 일정만 필터링 (derivedStateOf로 자동 업데이트)
+    // schedulesByDate가 변경되거나 selectedDate가 변경되면 자동으로 재계산
+    val filteredSchedules by derivedStateOf {
         viewModel.getSchedulesForDate(selectedDate)
     }
     

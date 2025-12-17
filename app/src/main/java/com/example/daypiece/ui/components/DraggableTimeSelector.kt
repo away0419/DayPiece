@@ -125,11 +125,21 @@ fun DraggableTimeSelector(
                         dragAnchorMinute = null
                         lastDragMinute = null
                         accumulatedMinutes = 0
-                        // 드래그 종료 시 10분 단위로 스냅
+                        // 드래그 종료 시 5분 단위로 스냅
                         selectedTimeRange?.let { (start, end) ->
-                            val snappedStart = (start / 10) * 10
-                            val snappedEnd = ((end + 9) / 10) * 10 // 올림
-                            onTimeRangeChange(snappedStart to snappedEnd)
+                            // 시작: 내림 (0~4 → 0, 5~9 → 5)
+                            val snappedStart = (start / 5) * 5
+                            // 종료: 올림 (1~5 → 5, 6~10 → 10)
+                            val snappedEnd = ((end + 4) / 5) * 5
+                            
+                            // 최소 5분 보장
+                            val finalEnd = if (snappedEnd <= snappedStart) {
+                                snappedStart + 5
+                            } else {
+                                snappedEnd
+                            }.coerceAtMost(1439) // 1440분(24시)을 넘지 않도록
+                            
+                            onTimeRangeChange(snappedStart to finalEnd)
                         }
                     },
                     onDragCancel = {
@@ -148,21 +158,22 @@ fun DraggableTimeSelector(
             val tileWidth = 25f // 타일 두께
             val innerRadius = outerRadius - tileWidth
             
-            // 144개의 10분 타일 (24시간 * 6)
-            for (i in 0 until 144) {
-                val startMinute = i * 10
-                val endMinute = startMinute + 10
+            // 288개의 5분 타일 (24시간 * 12)
+            for (i in 0 until 288) {
+                val startMinute = i * 5
+                val endMinute = startMinute + 5
                 val startAngle = (startMinute * 360f / 1440f) - 90f
-                val fullSweepAngle = 10 * 360f / 1440f
+                val fullSweepAngle = 5 * 360f / 1440f
                 // 간격을 주기 위해 실제 타일은 약간 작게 (80%)
                 val sweepAngle = fullSweepAngle * 0.8f
                 val gapAngle = fullSweepAngle * 0.2f
                 
                 // 타일 색상 결정
                 val tileColor = when {
-                    // 선택된 범위 (자정을 넘는 경우 고려)
-                    selectedTimeRange != null && isMinuteInRange(
+                    // 선택된 범위 (타일 범위와 선택 범위의 겹침 체크)
+                    selectedTimeRange != null && isTileInRange(
                         startMinute,
+                        endMinute,
                         selectedTimeRange.first,
                         selectedTimeRange.second
                     ) -> {
@@ -212,15 +223,17 @@ private fun offsetToMinuteWithAngle(offset: Offset, width: Float, height: Float)
 }
 
 /**
- * 특정 분이 선택 범위에 포함되는지 확인 (자정 넘는 경우 고려)
+ * 타일 범위가 선택 범위와 겹치는지 확인 (자정 넘는 경우 고려)
  */
-private fun isMinuteInRange(minute: Int, rangeStart: Int, rangeEnd: Int): Boolean {
+private fun isTileInRange(tileStart: Int, tileEnd: Int, rangeStart: Int, rangeEnd: Int): Boolean {
     return if (rangeStart <= rangeEnd) {
-        // 일반 범위
-        minute >= rangeStart && minute < rangeEnd + 10
+        // 일반 범위: 타일과 선택 범위의 겹침 체크
+        // [tileStart, tileEnd) 와 [rangeStart, rangeEnd) 겹침
+        tileStart < rangeEnd && tileEnd > rangeStart
     } else {
-        // 자정을 넘는 범위
-        minute >= rangeStart || minute < rangeEnd + 10
+        // 자정을 넘는 범위: [rangeStart, 1440) ∪ [0, rangeEnd)
+        // 타일이 두 범위 중 하나라도 겹치면 true
+        (tileStart < 1440 && tileEnd > rangeStart) || (tileStart < rangeEnd)
     }
 }
 
@@ -229,7 +242,8 @@ private fun isMinuteInRange(minute: Int, rangeStart: Int, rangeEnd: Int): Boolea
  */
 private fun isMinuteOccupied(minute: Int, occupiedRanges: List<Pair<Int, Int>>): Boolean {
     return occupiedRanges.any { (start, end) ->
-        minute in start until end
+        // 기존 일정의 끝 시간도 occupied로 간주 (겹침 방지)
+        minute >= start && minute < end
     }
 }
 
@@ -305,36 +319,36 @@ private fun getValidRange(
             }
         }
     } else {
-        // 반시계방향: start → anchor 방향으로 확인
+        // 반시계방향: anchor → start 역방향으로 확인
         // 자정을 넘는지 확인
         val crossesMidnight = start > anchor
         
         if (crossesMidnight) {
-            // 자정을 넘는 경우 (역방향): start ~ 1439, 0 ~ anchor
+            // 자정을 넘는 경우 (역방향): anchor ~ 0, 1439 ~ start
             var foundBlocker = false
             
-            // start부터 자정까지 확인
-            for (minute in start until 1440) {
-                if (isMinuteOccupied(minute, occupiedRanges)) {
+            // anchor부터 0까지 역방향 확인
+            for (minute in anchor downTo 0) {
+                if (isMinuteOccupied(minute, occupiedRanges) && minute != anchor) {
                     validStart = minute + 1
-                    if (validStart >= 1440) validStart = 0
                     foundBlocker = true
                     break
                 }
             }
             
-            // 차단되지 않았으면 자정 이후도 확인
+            // 차단되지 않았으면 자정 이전도 확인 (1439 ~ start)
             if (!foundBlocker) {
-                for (minute in 0..anchor) {
-                    if (isMinuteOccupied(minute, occupiedRanges) && minute != anchor) {
+                for (minute in 1439 downTo start) {
+                    if (isMinuteOccupied(minute, occupiedRanges)) {
                         validStart = minute + 1
+                        if (validStart >= 1440) validStart = 0
                         break
                     }
                 }
             }
         } else {
-            // 일반적인 경우: start ~ anchor
-            for (minute in start..anchor) {
+            // 일반적인 경우: anchor → start 역방향
+            for (minute in anchor downTo start) {
                 if (isMinuteOccupied(minute, occupiedRanges) && minute != anchor) {
                     validStart = minute + 1
                     break

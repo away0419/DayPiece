@@ -184,13 +184,20 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSelectedTimeRan
     endMinute: Int,
     color: Color
 ) {
-    val startAngle = (startMinute * 360f / 1440f) - 90f
+    // 각도 계산: 0분 = -90도(12시)
+    var startAngle = (startMinute * 360f / 1440f) - 90f
     var endAngle = (endMinute * 360f / 1440f) - 90f
     
+    // 종료 시간이 시작 시간보다 작거나 같으면 자정을 넘어간 경우
     if (endMinute <= startMinute) {
         endAngle += 360f
     }
     
+    // 각도를 0-360도 범위로 정규화 (중요!)
+    startAngle = ((startAngle % 360f) + 360f) % 360f
+    endAngle = ((endAngle % 360f) + 360f) % 360f
+    
+    // 스윕 각도 계산
     val sweepAngle = if (endAngle >= startAngle) {
         endAngle - startAngle
     } else {
