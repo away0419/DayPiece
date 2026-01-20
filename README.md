@@ -92,15 +92,26 @@ app/
 └── build.gradle
 ```
 
+<br/>
+
 ## 개발 계획
 
 1. ✅ 프로젝트 초기 설정
 2. ✅ 일간표(원형) 구현
-3. 주간표(선형) 구현
-4. 월간표(달력형) 구현
-5. 반복 일정 기능 구현
-6. 위젯 기능 구현
+3. ✅ 주간표(선형) 구현
+
+<br/>
+
+## 주요 화면
+
+<div style="overflow-x: auto; white-space: nowrap;">
+  <img src="./image/Screenshot_20260120_142524.png" alt="일간표 빈 화면" style="height: 400px; display: inline-block; margin-right: 10px;" />
+  <img src="./image/Screenshot_20260120_142733.png" alt="일정 추가 화면" style="height: 400px; display: inline-block; margin-right: 10px;" />
+  <img src="./image/Screenshot_20260120_142748.png" alt="일간표 일정 표시" style="height: 400px; display: inline-block;"/>
+</div>
+
+<br/>
 
 ## 라이선스
 
-(추가 예정)
+이 프로젝트는 개인 사용 목적으로 제작되었습니다.
